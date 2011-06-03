@@ -1,0 +1,314 @@
+(function() {
+  var app, errors, experiments, express, handlers, util;
+  express = require('express');
+  util = require('util');
+  experiments = require('./experiment');
+  handlers = require('./handler');
+  errors = require('./error');
+  app = express.createServer();
+  app.handler = new handlers.TimeOfDayWithDelaysHandler();
+  app.use(express.bodyParser());
+  app.use(express.logger());
+  app.post('/experiment', function(req, res) {
+    return app.handler.createExperiment(req.body, function(exp) {
+      if (exp instanceof errors.ExperimentError) {
+        throw exp;
+      } else {
+        return res.send(exp);
+      }
+    });
+  });
+  app.get('/experiment/:id', function(req, res) {
+    util.log('experiment get');
+    return app.handler.getExperiment(req.params.id, function(exp) {
+      if (exp instanceof errors.ExperimentError) {
+        throw exp;
+      } else {
+        return res.send(exp);
+      }
+    });
+  });
+  app.get('/experiment/:id/result', function(req, res) {
+    return app.handler.getResult(req.params.id, function(exp) {
+      if (exp instanceof errors.ExperimentError) {
+        throw exp;
+      } else {
+        return res.send(exp);
+      }
+    });
+  });
+  app.del('/experiment/:id', function(req, res) {
+    return app.handler.cancelExperiment(req.params.id, function(exp) {
+      if (exp instanceof errors.ExperimentError) {
+        throw exp;
+      } else {
+        return res.send(200);
+      }
+    });
+  });
+  app.error(function(err, req, res, next) {
+    util.log(err);
+    return res.send({
+      error: err.message
+    }, err.code);
+  });
+  app.listen(3000);
+}).call(this);
+(function() {
+  var BadExperimentDescription, ExperimentError, ExperimentNotFound, NotImplemented, UnknownExperimentType, util;
+  var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
+    function ctor() { this.constructor = child; }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  util = require('util');
+  ExperimentError = (function() {
+    __extends(ExperimentError, Error);
+    function ExperimentError() {
+      this.message = '';
+      if (typeof path !== "undefined" && path !== null) {
+        Error.call(this, 'Cannot find #{path}');
+      } else {
+        Error.call(this, 'Not found');
+      }
+      Error.captureStackTrace(this, arguments.callee);
+    }
+    ExperimentError.prototype.toJson = function() {
+      return {
+        code: this.code,
+        message: this.message
+      };
+    };
+    return ExperimentError;
+  })();
+  NotImplemented = (function() {
+    __extends(NotImplemented, ExperimentError);
+    function NotImplemented() {
+      NotImplemented.__super__.constructor.apply(this, arguments);
+      this.code = 500;
+      this.message = 'Not implemented';
+    }
+    return NotImplemented;
+  })();
+  UnknownExperimentType = (function() {
+    __extends(UnknownExperimentType, ExperimentError);
+    function UnknownExperimentType() {
+      UnknownExperimentType.__super__.constructor.apply(this, arguments);
+      this.code = 400;
+      this.message = 'Unknown experiment type';
+    }
+    return UnknownExperimentType;
+  })();
+  ExperimentNotFound = (function() {
+    __extends(ExperimentNotFound, ExperimentError);
+    function ExperimentNotFound() {
+      ExperimentNotFound.__super__.constructor.apply(this, arguments);
+      this.code = 404;
+      this.message = 'Experiment not found';
+    }
+    return ExperimentNotFound;
+  })();
+  BadExperimentDescription = (function() {
+    __extends(BadExperimentDescription, ExperimentError);
+    function BadExperimentDescription() {
+      BadExperimentDescription.__super__.constructor.apply(this, arguments);
+      this.code = 400;
+      this.message = 'Bad experiment description';
+    }
+    return BadExperimentDescription;
+  })();
+  exports.ExperimentError = ExperimentError;
+  exports.NotImplemented = NotImplemented;
+  exports.UnknownExperimentType = UnknownExperimentType;
+  exports.ExperimentNotFound = ExperimentNotFound;
+  exports.BadExperimentDescription = BadExperimentDescription;
+}).call(this);
+(function() {
+  var Experiment, ExperimentState, util;
+  util = require('util');
+  ExperimentState = {
+    Queued: 0,
+    Running: 1,
+    Completed: 2,
+    Cancelled: 3
+  };
+  Experiment = (function() {
+    function Experiment(description) {
+      this.description = description;
+      this.created = new Date;
+      this.state = ExperimentState.Queued;
+    }
+    Experiment.prototype.run = function() {
+      this.started = new Date;
+      return this.state = ExperimentState.Running;
+    };
+    Experiment.prototype.complete = function() {
+      this.completed = new Date;
+      return this.state = ExperimentState.Completed;
+    };
+    Experiment.prototype.cancel = function() {
+      this.cancelled = new Date;
+      return this.state = ExperimentState.Cancelled;
+    };
+    return Experiment;
+  })();
+  exports.Experiment = Experiment;
+}).call(this);
+(function() {
+  var EventEmitter, Experiment, Handler, TimeOfDayHandler, TimeOfDayWithDelaysHandler, TimeOfDayWithTz, errors, time, util;
+  var __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
+    function ctor() { this.constructor = child; }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child;
+  }, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  util = require('util');
+  errors = require('./error');
+  time = require('time');
+  EventEmitter = (require('events')).EventEmitter;
+  Experiment = (require('./experiment')).Experiment;
+  Handler = (function() {
+    __extends(Handler, EventEmitter);
+    function Handler() {
+      Handler.__super__.constructor.apply(this, arguments);
+    }
+    Handler.prototype.createExperiment = function(description, callback) {
+      return callback(errors.NotImplemented);
+    };
+    Handler.prototype.getExperiment = function(experimentId, callback) {
+      return callback(errors.NotImplemented);
+    };
+    Handler.prototype.getResult = function(experimentId, callback) {
+      return callback(errors.NotImplemented);
+    };
+    Handler.prototype.cancelExperiment = function(experimentId, callback) {
+      return callback(errors.NotImplemented);
+    };
+    return Handler;
+  })();
+  TimeOfDayHandler = (function() {
+    __extends(TimeOfDayHandler, Handler);
+    function TimeOfDayHandler() {
+      this.queue = [];
+      this.experiments = [];
+      this.running = false;
+      this.on('experimentAdded', __bind(function(id) {
+        if (!this.running) {
+          return this._runHead();
+        }
+      }, this));
+      this.on('experimentStarted', __bind(function(id) {
+        var head;
+        return head = this.queue[0];
+      }, this));
+      this.on('experimentCompleted', __bind(function(id) {
+        this._removeHead();
+        if (this.queue.length === 0) {
+          return this.running = false;
+        }
+      }, this));
+    }
+    TimeOfDayHandler.prototype.createExperiment = function(description, callback) {
+      var exp;
+      util.log(util.inspect(description));
+      if ((description != null) && (description.type != null)) {
+        if (description.type === 'TimeOfDay') {
+          exp = new Experiment(description);
+          this._addExperiment(exp);
+          return callback(exp);
+        } else {
+          return callback(new errors.UnknownExperimentType);
+        }
+      } else {
+        return callback(new errors.BadExperimentDescription);
+      }
+    };
+    TimeOfDayHandler.prototype.getExperiment = function(experimentId, callback) {
+      var _ref;
+      return callback((_ref = this.experiments[experimentId]) != null ? _ref : new errors.ExperimentNotFound);
+    };
+    TimeOfDayHandler.prototype.getResult = function(experimentId, callback) {
+      var exp, result;
+      exp = this.experiments[experimentId];
+      if (exp != null) {
+        if (exp.result != null) {
+          result = exp.result;
+        } else {
+          result = new errors.ResultNotFound;
+        }
+      } else {
+        result = new errors.ExperimentNotFound;
+      }
+      return callback(result);
+    };
+    TimeOfDayHandler.prototype.cancelExperiment = function(experimentId, callback) {
+      if (this.experiments[experimentId] != null) {
+        this.experiments[experimentId].cancel;
+        return callback('OK');
+      } else {
+        return callback(new errors.ExperimentNotFound);
+      }
+    };
+    TimeOfDayHandler.prototype._addExperiment = function(exp) {
+      exp.id = this.experiments.length;
+      this.queue.push(exp);
+      this.experiments.push(exp);
+      return this.emit('experimentAdded', exp.id);
+    };
+    TimeOfDayHandler.prototype._runHead = function() {
+      var head;
+      head = this.queue[0];
+      this.emit('experimentStarted', head.id);
+      head.run();
+      head.complete();
+      head.result = new Date;
+      return this.emit('experimentCompleted', head.id);
+    };
+    TimeOfDayHandler.prototype._removeHead = function() {
+      return this.queue = this.queue.slice(1, (this.queue.length + 1) || 9e9);
+    };
+    return TimeOfDayHandler;
+  })();
+  TimeOfDayWithDelaysHandler = (function() {
+    __extends(TimeOfDayWithDelaysHandler, TimeOfDayHandler);
+    function TimeOfDayWithDelaysHandler() {
+      TimeOfDayWithDelaysHandler.__super__.constructor.apply(this, arguments);
+    }
+    TimeOfDayWithDelaysHandler.prototype._runHead = function() {
+      var head, _ref;
+      head = this.queue[0];
+      this.emit('experimentStarted', head.id);
+      head.run();
+      return setTimeout(__bind(function() {
+        head.complete();
+        return this.emit('experimentCompleted', head.id);
+      }, this), (_ref = head.description.delay) != null ? _ref : 0);
+    };
+    return TimeOfDayWithDelaysHandler;
+  })();
+  TimeOfDayWithTz = (function() {
+    __extends(TimeOfDayWithTz, TimeOfDayHandler);
+    function TimeOfDayWithTz() {
+      TimeOfDayWithTz.__super__.constructor.apply(this, arguments);
+    }
+    TimeOfDayWithTz.prototype._runHead = function() {
+      var head, _ref;
+      head = this.queue[0];
+      this.emit('experimentStarted', head.id);
+      head.run();
+      time.tzset((_ref = head.description.tz) != null ? _ref : 'GMT');
+      head.result = time.Date();
+      head.complete();
+      return this.emit('experimentCompleted', head.id);
+    };
+    return TimeOfDayWithTz;
+  })();
+  exports.TimeOfDayHandler = TimeOfDayHandler;
+  exports.TimeOfDayWithDelaysHandler = TimeOfDayWithDelaysHandler;
+  exports.TimeOfDayWithTz = TimeOfDayWithTz;
+}).call(this);
