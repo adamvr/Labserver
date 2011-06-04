@@ -30,6 +30,12 @@ class ExperimentNotFound extends ExperimentError
         @code = 404
         @message = 'Experiment not found'
 
+class ResultNotFound extends ExperimentError
+    constructor: () ->
+        super
+        @code = 404
+        @message = 'Result not found'
+
 class BadExperimentDescription extends ExperimentError
     constructor: () ->
         super
@@ -41,4 +47,5 @@ exports.NotImplemented = NotImplemented
 exports.UnknownExperimentType = UnknownExperimentType
 exports.ExperimentNotFound = ExperimentNotFound
 exports.BadExperimentDescription = BadExperimentDescription
+exports.ResultNotFound = ResultNotFound
 

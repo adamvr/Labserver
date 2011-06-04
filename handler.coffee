@@ -6,13 +6,13 @@ time = require 'time'
 
 class Handler extends EventEmitter
     createExperiment: (description, callback) ->
-        callback errors.NotImplemented 
+        callback errors.NotImplemented()
     getExperiment: (experimentId, callback) ->
-        callback errors.NotImplemented
+        callback errors.NotImplemented()
     getResult: (experimentId, callback) ->
-        callback errors.NotImplemented
+        callback errors.NotImplemented()
     cancelExperiment: (experimentId, callback) ->
-        callback errors.NotImplemented
+        callback errors.NotImplemented()
 
 class TimeOfDayHandler extends Handler
     constructor: () ->
@@ -32,30 +32,32 @@ class TimeOfDayHandler extends Handler
             @_removeHead()
             if @queue.length is 0
                 @running = false
+            else
+                @_runHead()
 
     createExperiment: (description, callback) ->
         util.log util.inspect description
         if description? and description.type?
             if description.type is 'TimeOfDay'
-                exp = new Experiment(description)
+                exp = new Experiment description
                 @_addExperiment exp
                 callback exp
             else
-                callback new errors.UnknownExperimentType
+                callback new errors.UnknownExperimentType()
         else
-            callback new errors.BadExperimentDescription
+            callback new errors.BadExperimentDescription()
 
     getExperiment: (experimentId, callback) ->
-        callback @experiments[experimentId] ? new errors.ExperimentNotFound
+        callback @experiments[experimentId] ? new errors.ExperimentNotFound()
     getResult: (experimentId, callback) ->
         exp = @experiments[experimentId]
         if exp?
             if exp.result?
                 result = exp.result
             else
-                result = new errors.ResultNotFound
+                result = new errors.ResultNotFound()
         else
-            result = new errors.ExperimentNotFound
+            result = new errors.ExperimentNotFound()
 
         callback result
         
@@ -64,7 +66,7 @@ class TimeOfDayHandler extends Handler
             @experiments[experimentId].cancel
             callback 'OK'
         else 
-            callback new errors.ExperimentNotFound
+            callback new errors.ExperimentNotFound()
 
     _addExperiment: (exp) ->
         exp.id = @experiments.length
@@ -93,6 +95,7 @@ class TimeOfDayWithDelaysHandler extends TimeOfDayHandler
         head.run()
         setTimeout () =>
             head.complete()
+            head.result = new Date()
             @emit 'experimentCompleted', head.id
         , head.description.delay ? 0
 
