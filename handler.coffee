@@ -22,6 +22,7 @@ class TimeOfDayHandler extends Handler
 
         @on 'experimentAdded', (id) =>
             if not @running
+                @running = true
                 @_runHead()
 
         @on 'experimentStarted', (id) =>
@@ -63,7 +64,8 @@ class TimeOfDayHandler extends Handler
         
     cancelExperiment: (experimentId, callback) ->
         if @experiments[experimentId]?
-            @experiments[experimentId].cancel
+            @_cancelExp experimentId
+
             callback 'OK'
         else 
             callback new errors.ExperimentNotFound()
@@ -72,8 +74,8 @@ class TimeOfDayHandler extends Handler
         exp.id = @experiments.length
         @queue.push exp
         @experiments.push exp
-
         @emit 'experimentAdded', exp.id
+
 
     _runHead: () ->
         head = @queue[0]
@@ -81,8 +83,17 @@ class TimeOfDayHandler extends Handler
         @emit 'experimentStarted', head.id
         head.run()
         head.complete()
-        head.result = new Date
+        head.result = new Date()
         @emit 'experimentCompleted', head.id
+
+    _cancelExp: (id) ->
+        @experiments[id].cancel()
+        @queue = @queue.filter (q) ->
+            q.id != id
+
+        @emit 'experimentCancelled', id
+
+
 
     _removeHead: () ->
         @queue = @queue[1..@queue.length]

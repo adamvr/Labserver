@@ -3,6 +3,7 @@ util = require 'util'
 experiments = require './experiment'
 handlers = require './handler'
 errors = require './error'
+io = require 'socket.io'
 
 class API extends express.HTTPServer
     constructor: (@exphandler) ->
@@ -41,48 +42,43 @@ class API extends express.HTTPServer
     makeUri: (req, exp) ->
         "http://#{req.header 'host'}/experiment/#{exp.id}"
         
+#api = new API (new handlers.TimeOfDayWithDelaysHandler())
 
-api = new API (new handlers.TimeOfDayWithDelaysHandler())
+class SocketApi extends API
+    constructor: (@exphandler) ->
+        super @exphandler
+        @iosock = io.listen(@)
+
+        @exphandler.on 'experimentAdded', (id) =>
+            msg = "Experiment #{id} created with parameters #{util.inspect @exphandler.experiments[id].description}"
+            an = {announcement: msg}
+            util.log msg
+            @iosock.broadcast an
+
+        @exphandler.on 'experimentStarted', (id) =>
+            msg = "Experiment #{id} started"
+            util.log msg
+            an = {announcement: msg}
+            @iosock.broadcast an
+
+        @exphandler.on 'experimentCompleted', (id) =>
+            msg =  "Experiment #{id} completed - results #{@exphandler.experiments[id].result}"
+            util.log msg
+            an = {announcement: msg}
+            @iosock.broadcast an
+
+        @exphandler.on 'experimentCancelled', (id) =>
+            msg = "Experiment #{id} cancelled"
+            util.log 'cancelled'
+            an = {announcement: msg}
+            @iosock.broadcast an
+
+api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
+api.get '/json.js', (req, res) ->
+    res.sendfile "#{dirname}/test/json.js"
+
+api.get '/', (req, res) ->
+    res.sendfile "#{dirname}/test/chat.html"
+
+#api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
 api.listen 3000
-
-'''
-app = express.createServer()
-app.handler = new handlers.TimeOfDayWithDelaysHandler()
-app.use express.bodyParser()
-app.use express.logger()
-
-app.post '/experiment', (req, res) ->
-    app.handler.createExperiment req.body, (exp) ->
-        if exp instanceof errors.ExperimentError
-            throw exp
-        else
-            res.send exp
-
-app.get '/experiment/:id', (req, res) ->
-    util.log 'experiment get'
-    app.handler.getExperiment req.params.id, (exp) ->
-        if exp instanceof errors.ExperimentError
-            throw exp
-        else
-            res.send exp
-
-app.get '/experiment/:id/result', (req, res) ->
-    app.handler.getResult req.params.id, (exp) ->
-        if exp instanceof errors.ExperimentError
-            throw exp
-        else
-            res.send exp
-
-app.del '/experiment/:id', (req, res) ->
-    app.handler.cancelExperiment req.params.id, (exp) ->
-        if exp instanceof errors.ExperimentError
-            throw exp
-        else
-            res.send 200
-
-app.error (err, req, res, next) ->
-    util.log err
-    res.send({error: err.message}, err.code)
-
-app.listen 3000
-'''
