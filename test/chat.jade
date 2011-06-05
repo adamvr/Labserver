@@ -1,0 +1,33 @@
+!!!
+html
+  head
+    title Time of day!
+    script(type="text/javascript", src="http://code.jquery.com/jquery-1.6.1.min.js")
+    script(type="text/javascript", src="/socket.io/socket.io.js")
+    //script(type="text/javascript", src="http://jashkenas.github.com/coffee-script/extras/coffee-script.js")
+    :coffeescript
+      msg = (msg) ->
+        ($ '#chat').append "<p><b>#{msg.announcement}</b></p>"
+      ($ document).ready () ->
+        socket = new io.Socket null, {port:3000, rememberTransport:false}
+        socket.connect()
+        socket.on 'connect', () =>
+          msg {announcement: 'Socket connected'}
+
+        socket.on 'message', (o) =>
+          if 'buffer' of o then msg k for k in o.buffer else msg o
+            
+          
+
+    style
+      #chat { height: 300px; overflow: auto; width: 800px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
+      #chat p { padding: 8px; margin: 0; }
+      #chat p:nth-child(odd) { background: #F6F6F6; }
+
+
+  body
+    h1 Time of day logger
+    #chat
+      p Connecting
+
+

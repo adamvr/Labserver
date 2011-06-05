@@ -75,10 +75,10 @@ class SocketApi extends API
 
 api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
 api.get '/json.js', (req, res) ->
-    res.sendfile "#{dirname}/test/json.js"
+    res.sendfile "#{__dirname}/test/json.js"
 
 api.get '/', (req, res) ->
-    res.sendfile "#{dirname}/test/chat.html"
+    res.sendfile "#{__dirname}/test/chat.html"
 
 #api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
 api.listen 3000
