@@ -16,21 +16,56 @@ html
 
         socket.on 'message', (data) ->
           if 'buffer' of data then msg m for m in data else msg data
-
         socket.connect()
 
+      $('#submitExp').live 'click', () ->
+        alert $('#user').val()
+        $.ajax {
+          type: 'POST'
+          url: '/experiment'
+          data: {
+            type: 'Twitter'
+            user: "#{ $('#user').val }"
+          }
+          success: (msg) ->
+            alert(msg)
+        }
 
     style
       #chat { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
       #chat p { padding: 8px; margin: 0; }
       #other { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
       #chat p:nth-child(odd) { background: #F6F6F6; }
-      #box {height: 700px; overflow: auto; width: 800px;}
+      #box { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
 
 
   body
     h1 Time of day logger
-    #chat
-      p Connecting
+    table
+      tr 
+        td
+          #box
+            p Enter experiment details here
+            table
+              tr
+                td
+                  label Experiment type:
+                    select#type
+                      option(value='0') Select an experiment type:
+                      option(value='1') Twitter
+
+              tr
+                td
+                  label Username:
+                    input#user
+
+              tr
+                td
+                  input#submitExp(type='button', value="Submit experiment")
+
+        td
+          #chat
+            p Connecting
+              
 
 
