@@ -1,7 +1,7 @@
 express = require 'express'
 util = require 'util'
 experiments = require './experiment'
-handlers = require './handler'
+handlers = require './handlers/time'
 errors = require './error'
 io = require 'socket.io'
 
@@ -50,7 +50,7 @@ class SocketApi extends API
         @iosock = io.listen(@)
 
         @exphandler.on 'experimentAdded', (id) =>
-            msg = "Experiment #{id} created with parameters #{util.inspect @exphandler.experiments[id].description}"
+            msg = "Experiment #{id} created with parameters #{util.inspect @exphandler.experiments[id].experiment.description}"
             an = {announcement: msg}
             util.log msg
             @iosock.broadcast an
@@ -62,7 +62,7 @@ class SocketApi extends API
             @iosock.broadcast an
 
         @exphandler.on 'experimentCompleted', (id) =>
-            msg =  "Experiment #{id} completed - results #{@exphandler.experiments[id].result}"
+            msg =  "Experiment #{id} completed - results #{util.inspect @exphandler.experiments[id].result}"
             util.log msg
             an = {announcement: msg}
             @iosock.broadcast an
