@@ -1,7 +1,7 @@
 express = require 'express'
 util = require 'util'
 experiments = require './experiment'
-handlers = require './handlers/time'
+handlers = require './handlers/twitter'
 errors = require './error'
 io = require 'socket.io'
 
@@ -73,12 +73,22 @@ class SocketApi extends API
             an = {announcement: msg}
             @iosock.broadcast an
 
-api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
+        @exphandler.on 'error', (what) =>
+            msg = "Error: #{what}"
+            util.log msg
+            an = {announcement: msg}
+            @iosock.broadcast an
+
+api = new SocketApi (new handlers.TwitterExp())
 api.get '/json.js', (req, res) ->
     res.sendfile "#{__dirname}/test/json.js"
 
 api.get '/', (req, res) ->
     res.sendfile "#{__dirname}/test/chat.html"
+
+api.get '/jquery.js', (req, res) ->
+    res.sendfile "#{__dirname}/test/jquery.js"
+
 
 #api = new SocketApi (new handlers.TimeOfDayWithDelaysHandler())
 api.listen 3000

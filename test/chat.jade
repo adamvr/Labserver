@@ -18,18 +18,18 @@ html
           if 'buffer' of data then msg m for m in data else msg data
         socket.connect()
 
-      $('#submitExp').live 'click', () ->
-        alert $('#user').val()
+      $(document).delegate '#submitExp', 'click', () ->
+        data = {type: $('#type').val(), user: $('#user').val()}
         $.ajax {
           type: 'POST'
           url: '/experiment'
-          data: {
-            type: 'Twitter'
-            user: "#{ $('#user').val }"
-          }
-          success: (msg) ->
-            alert(msg)
+          contentType: 'application/json'
+          dataType: 'json'
+          data: JSON.stringify data
+          success: (msg, status) ->
         }
+
+
 
     style
       #chat { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
@@ -51,8 +51,8 @@ html
                 td
                   label Experiment type:
                     select#type
-                      option(value='0') Select an experiment type:
-                      option(value='1') Twitter
+                      option Select an experiment type:
+                      option Twitter
 
               tr
                 td
@@ -66,6 +66,3 @@ html
         td
           #chat
             p Connecting
-              
-
-

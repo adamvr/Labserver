@@ -27,7 +27,8 @@ class TwitterExp extends Handler
 
     createExperiment: (desc, cb) ->
         if not @validate desc
-            new errors.BadExperimentDescription()
+            @emit 'error', "Unable to create experiment - bad experiment description"
+            cb new errors.BadExperimentDescription()
         else
             exp = new Experiment desc
             @_addExperiment exp
@@ -35,16 +36,16 @@ class TwitterExp extends Handler
 
 
     getExperiment: (id, cb) ->
-        exp = @_getExperiment(id)
+        exp = @experiments[id]
+        exp = if exp?.experiment? then exp else new errors.ExperimentNotFound
         cb exp
 
     getResult: (id, cb) ->
-        res = @_getResult(id)
+        res = @experiments[id]
+        res = if res?.result? then res else new errors.ResultNotFound
         cb res
 
     cancelExperiment: (id, cb) ->
-        res = @_cancelExp(id)
-        cb res
 
     validate: (desc) ->
         for own k, v of @template
