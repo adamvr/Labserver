@@ -9,7 +9,7 @@ class TwitterExp extends Handler
         @queue = []
         @experiments = []
         @running = false
-        @template = {type: 'Twitter', user: null}
+        @template = {Tweets: {type: 'Tweets', user: null}, Public: {type: 'Public'}}
 
         @on 'experimentAdded', (id) =>
             util.log "Experiment added: #{util.inspect @experiments[id].experiment}"
@@ -18,7 +18,7 @@ class TwitterExp extends Handler
                 @running = true
                 @_runHead()
 
-        @on 'experimentCompleted', (id) ->
+        @on 'experimentCompleted', (id) =>
             @queue = @queue[1..@queue.length]
             if @queue.length is 0
                 @running = false
@@ -48,21 +48,21 @@ class TwitterExp extends Handler
 
     cancelExperiment: (id, cb) ->
 
-    isArray: (obj) ->
-        obj.constructor.toString().indexof('Array') isnt -1
-
     validate: (desc) ->
-        for own k, v of @template
-            # Desc must include all of template's fields
-            if k not of desc
-                return false
-            # And if the template has a defined value for a given field,
-            # desc's value for that field must match it.
-            else
-                if v? and desc[k] isnt v
+        if desc?.type? and desc.type of @template
+            for own k, v of (@template[desc.type])
+                # Desc must include all of template's fields
+                if k not of desc
                     return false
+                # And if the template has a defined value for a given field,
+                # desc's value for that field must match it.
+                else
+                    if v? and desc[k] isnt v
+                        return false
 
-        return true
+            return true
+        else
+            return false
 
     _addExperiment: (exp) ->
         @queue.push exp
@@ -83,8 +83,8 @@ class TwitterExp extends Handler
         path = switch head.description.type
             when 'Tweets'
                 "/1/statuses/user_timeline.json?screen_name=#{head.description.user}&include_entities=false&trim_user=true"
-            when 'Mentions'
-                "/1/statuses/mentions.json?screen_name=#{head.description.user}&include_entities=false&trim_user=true"
+            when 'Public'
+                "/1/statuses/public_timeline.json?include_entities=false&trim_user=true"
 
         
         options = 
@@ -95,6 +95,7 @@ class TwitterExp extends Handler
         req = http.get options
         req.on 'response', (response) =>
             req.buf = ''
+            util.log response.statusCode
             response.on 'data', (chunk) =>
                 req.buf += chunk
 
@@ -105,3 +106,5 @@ class TwitterExp extends Handler
                 @emit 'experimentCompleted', head.id
                 
 exports.TwitterExp = TwitterExp
+
+h = new TwitterExp()
