@@ -53,19 +53,19 @@ class SocketApi extends API
             msg = "Experiment #{id} created with parameters #{util.inspect @exphandler.experiments[id].experiment.description}"
             an = {announcement: msg}
             util.log msg
-            @iosock.broadcast an
+            @iosock.broadcast {event: 'experimentAdded', id: id}
 
         @exphandler.on 'experimentStarted', (id) =>
             msg = "Experiment #{id} started"
             util.log msg
             an = {announcement: msg}
-            @iosock.broadcast an
+            @iosock.broadcast {event: 'experimentStarted', id: id}
 
         @exphandler.on 'experimentCompleted', (id) =>
             msg =  "Experiment #{id} completed - results #{util.inspect @exphandler.experiments[id].result}"
             util.log msg
             an = {announcement: msg}
-            @iosock.broadcast an
+            @iosock.broadcast {event: 'experimentCompleted', id: id}
 
         @exphandler.on 'experimentCancelled', (id) =>
             msg = "Experiment #{id} cancelled"
@@ -77,7 +77,7 @@ class SocketApi extends API
             msg = "Error: #{what}"
             util.log msg
             an = {announcement: msg}
-            @iosock.broadcast an
+            @iosock.broadcast {event: 'error', what: what}
 
 api = new SocketApi (new handlers.TwitterExp())
 api.get '/json.js', (req, res) ->

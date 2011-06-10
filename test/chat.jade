@@ -4,32 +4,122 @@ html
     title Time of day!
     script(type="text/javascript", src="http://code.jquery.com/jquery-1.6.1.min.js")
     script(type="text/javascript", src="/socket.io/socket.io.js")
+    script(type="text/javascript", src="/json.js")
     //script(type="text/javascript", src="http://jashkenas.github.com/coffee-script/extras/coffee-script.js")
-    :coffeescript
-      msg = (msg) ->
-        $('#chat').append("<p>#{msg.announcement}</p>")
+    script
+      var curExp = {};
+      function procEvent(msg) {
+        var eventForMe = (curExp !== undefined && curExp.id === msg.id);
+        switch(msg.event) {
+          case "experimentAdded":
+            writeMsg('#chat', 'Experiment ' + msg.id + ' added');
+            break;
+          case "experimentStarted":
+            writeMsg('#chat', 'Experiment ' + msg.id + ' started');
+            if(eventForMe) {
+              writeMsg('#myexp', 'Experiment started');
+            }
+            break;
+          case "experimentCompleted":
+            writeMsg('#chat', 'Experiment ' + msg.id + ' completed');
+            writeMsg('#chat', 'Results <a href="' + genUri(msg.id, true) + '"> here </a>');
 
-      $(document).ready () ->
-        socket = new io.Socket null, {port:3000, rememberTransport: false}
-        socket.on 'connect', () ->
-          msg {announcement: 'Socket connected'}
-
-        socket.on 'message', (data) ->
-          if 'buffer' of data then msg m for m in data else msg data
-        socket.connect()
-
-      $(document).delegate '#submitExp', 'click', () ->
-        data = {type: $('#type').val(), user: $('#user').val()}
-        $.ajax {
-          type: 'POST'
-          url: '/experiment'
-          contentType: 'application/json'
-          dataType: 'json'
-          data: JSON.stringify data
-          success: (msg, status) ->
+            if(eventForMe) {
+              writeMsg('#myexp', 'Experiment complete');
+              writeMsg('#myexp', 'Results: ');
+              $.ajax({
+                type: 'GET',
+                url: '/experiment/'+msg.id+'/result',
+                dataType: 'json',
+                success: function(msg) {
+                  curExp = msg;
+                  displayObj('#myexp', msg);
+                }
+              });
+            }
+            break;
+          case "error":
+            writeMsg('#chat', 'Error: ' + msg.what);
+            break;
+          default:
+            writeMsg('#chat', 'Unknown event ' + msg.event);
         }
+      };
+
+      function writeMsg(sel,t) {
+        $('<p>', {html: t}).appendTo(sel);
+        //$('#chat').append('<p>' + t + '</p>');
+      };
+
+      function genUri(id, result) {
+        var str = 'http://' + document.location.host + '/experiment/' + id + (result ? '/result' : '');
+        return  str;
+      };
+
+      function displayObj(sel, obj) {
+        var str = '<table>';
+        $.each(obj, function(k,v) {
+          str += '<tr>';
+          str += '<td>' + k + ':</td>';
+          if(typeof v == 'object') {
+            str += '<td>' + JSON.stringify(v) + '</td>';
+          } else {
+            str += '<td>' + v + '</td>';
+          }
+          str += '</tr>';
+        });
+
+        str += '</table>';
+        writeMsg('#myexp', str);
+      }
 
 
+
+      $(document).ready(function() {
+        socket = new io.Socket(null, {port: 3000, rememberTransport: false});
+        socket.on("connect", function() {
+          writeMsg('#chat', 'Socket connected');
+        });
+
+        socket.on("message", function(msg) {
+          procEvent(msg);
+        });
+        socket.connect();
+        writeMsg('#chat', 'Connecting socket.io');
+      });
+
+      $(document).delegate('#submitExp', 'click', function() {
+        $('#myexp').html('');
+        var desc = {type: $('#type').val(), user: $('#user').val()};
+        $.ajax({
+          type: 'POST',
+          url: '/experiment',
+          data: JSON.stringify(desc),
+          contentType: 'application/json',
+          dataType: 'json',
+          success: function(msg) {
+            if('experiment' in msg) {
+              var expUri = msg.experiment;
+              writeMsg('#myexp', "Experiment created: <a href='" + msg.experiment + "'> here </a>");
+              $.ajax({
+                type: 'GET',
+                url: expUri.replace('http://'+document.location.host, ''),
+                dataType: 'json',
+                success: function(msg) {
+                  curExp = msg;
+                  displayObj('#myexp', msg);
+                }
+              });
+            } else {
+              writeMsg('#myexp', 'Unknown error in creating experiment');
+            }
+          },
+          error: function(x, msg) {
+            var err = $.parseJSON(x.responseText);
+            writeMsg('#myexp', 'Error creating experiment: ' + err.error);
+          }
+        });
+      });
 
     style
       #chat { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
@@ -37,32 +127,45 @@ html
       #other { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
       #chat p:nth-child(odd) { background: #F6F6F6; }
       #box { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
+      #myexp { height: 300px; overflow: auto; width: 400px; border: 1px solid #eee; font: 13px Helvetica, Arial; }
+      #myexp p { padding: 8px; margin: 0; }
+      #myexp p:nth-child(odd) { background: #F6F6F6; }
 
 
   body
-    h1 Time of day logger
+    h1 Twitter Lab Server
     table
       tr 
+        td 
+          b Experiment specification
+        td
+          b Experiment status
+        td
+          b Lab messages
+      tr
         td
           #box
-            p Enter experiment details here
+            p Enter experiment details here:
             table
               tr
                 td
                   label Experiment type:
-                    select#type
-                      option Select an experiment type:
-                      option Twitter
+                td
+                  select#type
+                    option Select an experiment type:
+                    option Twitter
 
               tr
                 td
                   label Username:
-                    input#user
+                td
+                  input#user
 
               tr
                 td
                   input#submitExp(type='button', value="Submit experiment")
 
         td
+          #myexp
+        td
           #chat
-            p Connecting

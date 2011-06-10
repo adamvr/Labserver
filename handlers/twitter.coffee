@@ -11,7 +11,7 @@ class TwitterExp extends Handler
         @running = false
         @template = {type: 'Twitter', user: null}
 
-        @on 'experimentAdded', (id) ->
+        @on 'experimentAdded', (id) =>
             util.log "Experiment added: #{util.inspect @experiments[id].experiment}"
             util.log "Are we running? #{if @running then 'yes' else 'no'}"
             if not @running
@@ -37,15 +37,19 @@ class TwitterExp extends Handler
 
     getExperiment: (id, cb) ->
         exp = @experiments[id]
-        exp = if exp?.experiment? then exp else new errors.ExperimentNotFound
+        exp = if exp?.experiment? then exp.experiment else new errors.ExperimentNotFound
         cb exp
 
     getResult: (id, cb) ->
         res = @experiments[id]
-        res = if res?.result? then res else new errors.ResultNotFound
+        res = if res?.result? then res.result else new errors.ResultNotFound
         cb res
 
+
     cancelExperiment: (id, cb) ->
+
+    isArray: (obj) ->
+        obj.constructor.toString().indexof('Array') isnt -1
 
     validate: (desc) ->
         for own k, v of @template
@@ -75,10 +79,18 @@ class TwitterExp extends Handler
         head = @queue[0]
         head.run()
         @emit 'experimentStarted', head.id
+
+        path = switch head.description.type
+            when 'Tweets'
+                "/1/statuses/user_timeline.json?screen_name=#{head.description.user}&include_entities=false&trim_user=true"
+            when 'Mentions'
+                "/1/statuses/mentions.json?screen_name=#{head.description.user}&include_entities=false&trim_user=true"
+
+        
         options = 
             host: 'api.twitter.com'
             port: 80
-            path:"/1/statuses/user_timeline.json?screen_name=#{head.description.user}&include_entities=false&trim_user=true"
+            path: path
 
         req = http.get options
         req.on 'response', (response) =>
