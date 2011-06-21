@@ -106,5 +106,3 @@ class TwitterExp extends Handler
                 @emit 'experimentCompleted', head.id
                 
 exports.TwitterExp = TwitterExp
-
-h = new TwitterExp()
